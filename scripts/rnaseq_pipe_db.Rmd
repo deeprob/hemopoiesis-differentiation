@@ -1,0 +1,113 @@
+---
+title: "rnaseq_pipe_db"
+author: "Deepro Banerjee"
+date: "4/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+## RNASeq Pipeline
+
+### DESeq2
+
+Comparing CMP cell lines to ERY cell lines
+
+
+```{r}
+generate_count_mat = function(filename1a, filename1b, filename2a, filename2b){
+  cell1a = read.csv(filename1a, sep = "\t")
+  cell1b = read.csv(filename1b, sep = "\t")
+  cell1a=cell1a[,c("gene_id","expected_count")]
+  cell1b=cell1b[,c("gene_id","expected_count")]
+  cell1 = merge(cell1a, cell1b, by.x = "gene_id", by.y = "gene_id")
+  
+  
+  cell2a = read.csv(filename2a, sep = "\t")
+  cell2b = read.csv(filename2b, sep = "\t")
+  cell2a=cell2a[,c("gene_id","expected_count")]
+  cell2b=cell2b[,c("gene_id","expected_count")]
+  cell2 = merge(cell2a, cell2b, by.x = "gene_id", by.y = "gene_id")
+  
+  mat_counts = merge(cell1, cell2, by.x = "gene_id", by.y = "gene_id")
+  colnames(mat_counts) <- c("gene_id", "untreated1", "untreated2", "treated1", "treated2")
+  cts = round(mat_counts[,-1])
+  row.names(cts) = mat_counts[,1]
+  return(cts)
+}
+
+```
+
+```{r}
+deseq_res = function(filename1a, filename1b, filename2a, filename2b){
+  cts = generate_count_mat(filename1a, filename1b, filename2a, filename2b)
+  
+  coldata =  read.csv("./rnaseq_annot.csv", row.names = 1)
+  coldata$condition = factor(coldata$condition)
+  dds = DESeqDataSetFromMatrix(countData = cts, colData = coldata, design= ~ condition)
+  dds = DESeq(dds)
+  res = results(dds, name="condition_untreated_vs_treated")
+
+  return(res)
+}
+```
+
+
+```{r}
+de_res = deseq_res("../data/raw/CMP/ENCFF623OLU.tsv", '../data/raw/CMP/ENCFF691MHW.tsv', 
+         '../data/raw/Erythroblast/ENCFF342WUL.tsv', '../data/raw/Erythroblast/ENCFF858JHF.tsv')
+```
+
+
+```{r}
+sigres = de_res[which(de_res$padj<0.001),]
+sigres[order(-sigres$padj),]
+```
+
+
+### Limma 
+
+```{r}
+library(limma)
+```
+
+
+
+```{r}
+limma_res = function(filename1a, filename1b, filename2a, filename2b){
+  counts_mat = generate_count_mat(filename1a, filename1b, filename2a, filename2b)
+  
+  coldata =  read.csv("./rnaseq_annot.csv", row.names = 1)
+  trts = coldata$condition
+  design_trt=model.matrix(~0+trts)
+  
+  
+  v <- voom(counts_mat, design_trt, plot=TRUE)
+  fit <- lmFit(v, design_trt)
+  fit <- eBayes(fit)
+  
+  return(topTable(fit, coef=ncol(design_trt)))  
+}
+
+```
+
+
+
+```{r}
+limma_res("../data/raw/CMP/ENCFF623OLU.tsv", '../data/raw/CMP/ENCFF691MHW.tsv', 
+         '../data/raw/Erythroblast/ENCFF342WUL.tsv', '../data/raw/Erythroblast/ENCFF858JHF.tsv')
+```
+
+
+```{r}
+de_res["ENSMUSG00000097971.3",]
+```
+
