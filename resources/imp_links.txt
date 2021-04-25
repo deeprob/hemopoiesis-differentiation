@@ -1,0 +1,4 @@
+tree creation: https://compgenomr.github.io/book/gene-expression-analysis-using-high-throughput-sequencing-technologies.html
+limma voom: https://bioconductor.org/packages/release/workflows/vignettes/RNAseq123/inst/doc/limmaWorkflow.html
+deseq2: https://genviz.org/module-04-expression/0004/02/01/DifferentialExpression/#:~:text=Differential%20expression%20analysis%20is%20used,untreated%20samples
+
