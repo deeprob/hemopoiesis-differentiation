@@ -86,19 +86,22 @@ countData.list <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath,
 
 countData.df <- do.call("cbind", countData.list)
 colsToKeep <- c(1,grep("expected_count", names(countData.df)))
-countss <- countData.df[,colsToKeep]
-bak=countData.df[,1]
+counts <- countData.df[,colsToKeep]
+countss <- counts[rowSums(counts[,(2:5)]) > 0, ]
 names(countss) <- c("gene_id",sampleNames)
-countss[,2:4] <- round(countss[,2:4])
-bak=countss[,1]
+countss[,2:5] <- round(countss[,2:5])
 countss=na.omit(countss)
-countss=cbind(Dummy=c(1:69691),countss[,-1])
+
+
+
+
+
 
 
    
 
 sampleMetaData <- data.frame(cell_line=c(rep(c("HSC"), 2), rep(c("Erythroblast"),2)), Type=rep(c(rep(c("Case"), 2), rep(c("Control"), 2)),1))
-rsem.in=DESeqDataSetFromMatrix(round(cts), colData = sampleMetaData, design = ~ cell_line, tidy = T)
+rsem.in=DESeqDataSetFromMatrix(countss, colData = sampleMetaData, design = ~ cell_line, tidy = T)
 rsem.de <- DESeq(rsem.in)
 
 
@@ -119,10 +122,45 @@ results_na_o=na.omit(results1)
 plotMA(results_na_o)
 
 
-
+library(qvalue)
 
 
 qvalue(results_na_o$padj,0.05)
+
+
+
+
+
+
+
+
+#compute the variance of each gene across samples
+V <- apply(tpm, 1, var)
+#sort the results by variance in decreasing order 
+#and select the top 100 genes 
+selectedGenes <- countss[900:1000,1]
+
+
+
+library(pheatmap)
+
+pheatmap(countss[2:100,2:5],scale = 'row', show_rownames = FALSE)
+
+
+
+library(stats)
+correlationMatrix <- cor(countss[2:100,2:5])
+
+
+library(corrplot)
+corrplot(correlationMatrix, order = 'hclust',  addrect = 2, addCoef.col = 'white', number.cex = 0.7) 
+
+
+library(pheatmap)
+# split the clusters into two based on the clustering similarity 
+pheatmap(correlationMatrix, annotation_col = colData,  cutree_cols = 2)
+
+
 
 
 
@@ -137,7 +175,7 @@ library(viridis)
 
 deseq2ResDF <- as.data.frame(results_na_o)
 
-
+deseq2ResDF 
 
 head(deseq2ResDF)
 
