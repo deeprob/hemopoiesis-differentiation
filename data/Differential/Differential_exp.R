@@ -84,12 +84,12 @@ mcols(rowData(rsem.de)) <- c(mcols(rowData(rsem.de)))
 "ENCFF667IDY", "ENCFF655LMK", "ENCFF342WUL", "ENCFF858JHF"
 
 
-
+"ENCFF667IDY", "ENCFF655LMK", "ENCFF342WUL", "ENCFF858JHF"
 1:2
 
 
 filePath <- "~/GitHub/hemopoiesis-differentiation/data/"
-sampleNames <- c("ENCFF247FEJ", "ENCFF064MKY", "ENCFF667IDY", "ENCFF655LMK")
+sampleNames <- c("ENCFF247FEJ", "ENCFF064MKY", "ENCFF667IDY", "ENCFF655LMK") 
 countData.list <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, ".tsv"), header=T, sep="\t"), simplify=F)
 
 
@@ -239,7 +239,7 @@ countss=countss[-1]
 lim_ind=which(pvals<0.000000000005)
 
 
-
+m2
 significant_lim=countss[lim_ind,]
 
 
@@ -654,11 +654,52 @@ plotRegion(CTCF_Cuts_open, outliers = 0.001) + ggtitle("NucFree Cuts Centred on 
 
 
 
+CLUSTERING AGAIN
 
 
 
 
 
+filePath <- "~/GitHub/hemopoiesis-differentiation/data/"
 
+sampleNames <- c("ENCFF247FEJ", "ENCFF064MKY", "ENCFF667IDY", "ENCFF655LMK", "ENCFF667IDY", "ENCFF655LMK", "ENCFF342WUL", "ENCFF858JHF")
+
+countData.list <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, ".tsv"), header=T, sep="\t"), simplify=F)
+
+
+
+countData.df <- do.call("cbind", countData.list)
+colsToKeep <- c(1,grep("expected_count", names(countData.df)))
+counts <- countData.df[,colsToKeep]
+countss <- counts[rowSums(counts[,(2:5)]) > 0, ]
+names(countss) <- c("gene_id",sampleNames)
+countss[,2:5] <- round(countss[,2:5])
+countss=na.omit(countss)
+
+
+
+
+
+library(pheatmap)
+
+pheatmap(countss[1:1000,2:9],scale = 'row', show_rownames = FALSE)
+
+
+
+library(stats)
+correlationMatrix <- cor(countss[2:10000,2:9])
+
+
+library(corrplot)
+corrplot(correlationMatrix, order = 'hclust',  addrect = 2, addCoef.col = 'white', number.cex = 0.7) 
+
+
+coldata=as.factor(sampleMetaData[1:2])
+
+library(pheatmap)
+# split the clusters into two based on the clustering similarity 
+pheatmap(correlationMatrix,cutree_cols = 2, annotation_col = names(sampleMetaData))
+
+correlationMatrix
 
 

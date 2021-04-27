@@ -143,6 +143,8 @@ save(myCounts, file = "countsFromATAC.RData")
 
 
 
+pheatmap(myCounts[1:100,], scale='row', show_rownames = FALSE)
+
 
 
 
@@ -211,3 +213,38 @@ write.table(anno_HSCMinusCMP_df, "anno_HSCMinusCMP.csv", quote = FALSE, row.name
 
 library(ChIPseeker)
 Calls <- annotatePeak(My_peaks, TxDb = TxDb.Hsapiens.UCSC.hg19.knownGene)
+
+
+
+
+
+
+
+
+
+
+
+pheatmap(myCounts[1:100,], scale='row', show_rownames = FALSE)
+
+
+
+
+
+library(stats)
+correlationMatrix <- cor(myCounts[1:1000,1:4])
+
+
+library(corrplot)
+corrplot(correlationMatrix, order = 'hclust',  addrect = 6, addCoef.col = 'white', number.cex = 0.7) 
+
+
+coldata=as.factor(sampleMetaData[1:2])
+
+library(pheatmap)
+# split the clusters into two based on the clustering similarity 
+pheatmap(correlationMatrix,cutree_cols = 2)
+
+
+
+
+
