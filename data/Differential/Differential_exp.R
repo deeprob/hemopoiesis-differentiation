@@ -48,8 +48,7 @@ count_control1=read.csv('ENCFF247FEJ.tsv')
 #remove the 'width' column
 countData <- as.matrix(subset(count_control1))
 #define the experimental setup 
-colData <- read.table(coldata_file, header = T, sep = '\t', 
-                      stringsAsFactors = TRUE)
+colData <- read.table(coldata_file, header = T, sep = '\t', stringsAsFactors = TRUE)
 #define the design formula
 designFormula <- "~ group"
 
@@ -62,12 +61,18 @@ ensembl67 <- useMart(host='may2012.archive.ensembl.org', biomart='ENSEMBL_MART_E
 ## current annotation (GRCm38, mm10)
 ensembl76 <- useMart("ensembl", dataset="mmusculus_gene_ensembl")
 
-bm <- getBM(attributes=c("ensembl_gene_id", "external_gene_id", "description"), filter="ensembl_gene_id", values=as.vector(bak1), mart=ensembl67)
+bm <- getBM(attributes=c("ensembl_gene_id", "description"), filter="name", values=significant_genes, mart=ensembl)
+
+mart <- biomaRt::useDataset(dataset = "mmusculus",   mart = useMart("ENSEMBL_MART_ENSEMBL", host = "www.ensembl.org"))   
+
+
+
 
 DESeq2Features <- data.frame(ensembl_gene_id = as.character(bak1))
 DESeq2Features$ensembl_gene_id <- as.character(DESeq2Features$ensembl_gene_id)
 
 library(dplyr)
+library(DESeq2)
 
 ### join them together
 rowData <- dplyr::left_join(DESeq2Features, bm, by = "ensembl_gene_id")
@@ -76,10 +81,47 @@ rowData <- as(rowData, "DataFrame")
 mcols(rowData(rsem.de)) <- c(mcols(rowData(rsem.de)))
 #save(DESeq2Table, file = "geneCounts.RData")
 
+"ENCFF667IDY", "ENCFF655LMK", "ENCFF342WUL", "ENCFF858JHF"
+
+
+
+1:2
 
 
 filePath <- "~/GitHub/hemopoiesis-differentiation/data/"
-sampleNames <- c("ENCFF858JHF", "ENCFF342WUL", "ENCFF247FEJ", "ENCFF064MKY")
+sampleNames <- c("ENCFF247FEJ", "ENCFF064MKY", "ENCFF667IDY", "ENCFF655LMK")
+countData.list <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, ".tsv"), header=T, sep="\t"), simplify=F)
+
+
+
+countData.df <- do.call("cbind", countData.list)
+colsToKeep <- c(1,grep("expected_count", names(countData.df)))
+counts <- countData.df[,colsToKeep]
+countss <- counts[rowSums(counts[,(2:5)]) > 0, ]
+names(countss) <- c("gene_id",sampleNames)
+countss[,2:5] <- round(countss[,2:5])
+countss=na.omit(countss)
+
+
+
+#sampleMetaData <- data.frame(cell_line=c(rep(c("HSC"), 2), rep(c("CMP"),2), rep(c("CFU-E"),2), rep(c("Erythroblast"),2)), Type=rep(c(rep(c("Ctrl"), 2), rep(c("CASE_1"), 2), rep(c("CASE_2"), 2), rep(c("CASE_3"), 2))))
+
+
+sampleMetaData <- data.frame(cell_line=c(rep(c("HSC"), 2), rep(c("CMP"),2)), sampleNames)
+
+rsem.in=DESeqDataSetFromMatrix(countss, colData = sampleMetaData, design = ~ cell_line, tidy = T)
+rsem.de <- DESeq(rsem.in)
+
+
+
+1:3
+
+
+
+
+
+filePath <- "~/GitHub/hemopoiesis-differentiation/data/"
+sampleNames <- c("ENCFF247FEJ", "ENCFF064MKY", "ENCFF623OLU", "ENCFF691MHW")
 countData.list <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, ".tsv"), header=T, sep="\t"), simplify=F)
 
 
@@ -98,13 +140,107 @@ countss=na.omit(countss)
 
 
 
-   
+sampleMetaData <- data.frame(cell_line=c(rep(c("HSC"), 2), rep(c("CFU-E"),2)), Type=rep(c(rep(c("Ctrl"), 2), rep(c("CASE_1"), 2))))
 
-sampleMetaData <- data.frame(cell_line=c(rep(c("HSC"), 2), rep(c("Erythroblast"),2)), Type=rep(c(rep(c("Case"), 2), rep(c("Control"), 2)),1))
 rsem.in=DESeqDataSetFromMatrix(countss, colData = sampleMetaData, design = ~ cell_line, tidy = T)
 rsem.de <- DESeq(rsem.in)
 
 
+
+
+
+1:4
+
+
+
+
+
+
+
+filePath <- "~/GitHub/hemopoiesis-differentiation/data/"
+sampleNames <- c("ENCFF247FEJ", "ENCFF064MKY",  "ENCFF342WUL", "ENCFF858JHF")
+countData.list <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, ".tsv"), header=T, sep="\t"), simplify=F)
+
+
+
+countData.df <- do.call("cbind", countData.list)
+colsToKeep <- c(1,grep("expected_count", names(countData.df)))
+counts <- countData.df[,colsToKeep]
+countss <- counts[rowSums(counts[,(2:5)]) > 0, ]
+names(countss) <- c("gene_id",sampleNames)
+countss[,2:5] <- round(countss[,2:5])
+countss=na.omit(countss)
+
+
+
+
+sampleMetaData <- data.frame(cell_line=c(rep(c("HSC"), 2), rep(c("CFU-E"),2)), Type=rep(c(rep(c("Ctrl"), 2), rep(c("CASE_1"), 2))))
+
+rsem.in=DESeqDataSetFromMatrix(countss, colData = sampleMetaData, design = ~ cell_line, tidy = T)
+rsem.de <- DESeq(rsem.in)
+
+
+dim(rsem.de [rowSums(counts(rsem.de )) > 5, ])
+
+results1=results(rsem.de)
+
+results_na_o=na.omit(results1)
+
+plotMA(results_na_o)
+
+
+
+sigres = rsem.de[which(rsem.de$padj<0.001),]
+
+
+
+
+
+
+
+
+
+
+filePath <- "~/GitHub/hemopoiesis-differentiation/data/"
+sampleNames <- c("ENCFF247FEJ", "ENCFF064MKY", "ENCFF667IDY", "ENCFF655LMK")
+countData.list <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, ".tsv"), header=T, sep="\t"), simplify=F)
+
+
+
+countData.df <- do.call("cbind", countData.list)
+colsToKeep <- c(1,grep("expected_count", names(countData.df)))
+counts <- countData.df[,colsToKeep]
+countss <- counts[rowSums(counts[,(2:5)]) > 0, ]
+names(countss) <- c("gene_id",sampleNames)
+countss[countss < 0] <- NA
+countss[,2:5] <- round(countss[,2:5])
+countss=na.omit(countss)
+
+
+
+sampleMetaData <- data.frame(cell_line=c(rep(c("HSC"), 2), rep(c("CFU-E"),2)), ID=c("ENCFF247FEJ", "ENCFF064MKY", "ENCFF667IDY", "ENCFF655LMK"))
+
+
+  
+  cell_line = sampleMetaData$cell_line
+  design_trt=model.matrix(~0+cell_line)
+  
+
+row.names(countss)= countss[,1]
+countss=countss[-1]
+  v <- voom(countss, design_trt, plot=TRUE)
+  fit <- lmFit(v, design_trt)
+  fit <- eBayes(fit)
+  
+
+
+  topTable(fit, number=10000, coef=ncol(design_trt))
+
+lim_ind=which(pvals<0.000000000005)
+
+
+
+significant_lim=countss[lim_ind,]
 
 
 
@@ -122,13 +258,15 @@ results_na_o=na.omit(results1)
 plotMA(results_na_o)
 
 
+results_na_o
+
+
+
+
 library(qvalue)
 
 
-qvalue(results_na_o$padj,0.05)
-
-
-
+qvalues=qvalue(results_na_o$padj,0.05)
 
 
 
@@ -144,21 +282,24 @@ selectedGenes <- countss[900:1000,1]
 
 library(pheatmap)
 
-pheatmap(countss[2:100,2:5],scale = 'row', show_rownames = FALSE)
+pheatmap(significant_lim,scale = 'row', show_rownames = FALSE)
 
 
 
 library(stats)
-correlationMatrix <- cor(countss[2:100,2:5])
+correlationMatrix <- cor(countss[2:10000,2:5])
 
 
 library(corrplot)
 corrplot(correlationMatrix, order = 'hclust',  addrect = 2, addCoef.col = 'white', number.cex = 0.7) 
 
 
+coldata=as.factor(sampleMetaData[1:2])
+
 library(pheatmap)
 # split the clusters into two based on the clustering similarity 
-pheatmap(correlationMatrix, annotation_col = colData,  cutree_cols = 2)
+pheatmap(correlationMatrix, annotation_row = coldata,cutree_cols = 2)
+
 
 
 
@@ -205,10 +346,15 @@ which(qv$significant == TRUE)
 
 
 
+index=which(sign == "TRUE", arr.ind = TRUE)
+
+
+library(R.utils)
 
 
 
-
+significant_genes=countss[indexes,]
+significant_genes=na.omit(significant_genes)
 
 
 
@@ -244,6 +390,39 @@ row.names(countss)<-countss$gene_id
 
 
 
+
+
+
+
+
+
+
+
+ANNOTATION 2.0
+
+library(DESeq2)
+library(gProfileR)
+library(knitr)
+# extract differential expression results
+DEresults <- results(dds, contrast = c('group', 'CASE', 'CTRL'))
+
+
+
+
+#remove genes with NA values 
+DE <- results1[!is.na(results1$padj),]
+
+results1
+#select genes with adjusted p-values below 0.1
+DE <- DE[DE$padj < 0.1,]
+#select genes with absolute log2 fold change above 1 (two-fold change)
+DE <- DE[abs(DE$log2FoldChange) > 1,]
+
+#get the list of genes of interest
+genesOfInterest <- rownames(DE)
+
+#calculate enriched GO terms
+goResults <- gprofiler(query = genesOfInterest, organism = 'mmusculus', src_filter = 'GO', hier_filtering = 'moderate')
 
 
 
