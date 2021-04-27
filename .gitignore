@@ -1,1 +1,4 @@
 **/.DS_Store
+data/downloading/win-sudo/
+*.bam
+data/Bams/Mus_musculus.GRCm39.dna.primary_assembly.fa

@@ -1,0 +1,250 @@
+---
+title: "ATAC"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+load("ATAC_Data/ATAC_RData/countsFromATAC.RData")
+
+
+
+filePath <- "~/GitHub/hemopoiesis-differentiation/data/BedFiles/"
+sampleNames <- c("ENCFF662DYG", "ENCFF832UUS", "ENCFF343PTQ", "ENCFF255IVU")
+countData.list <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, ".tsv"), header=T, sep="\t"), simplify=F)
+
+
+Group=factor(c("HSC","HSC","CMP","CMP"))
+
+countData.df <- do.call("cbind", countData.list)
+colsToKeep <- c(1,grep("expected_count", names(countData.df)))
+counts <- countData.df[,colsToKeep]
+countss <- counts[rowSums(counts[,(2:5)]) > 0, ]
+names(countss) <- c("gene_id",sampleNames)
+countss[,2:5] <- round(countss[,2:5])
+countss=na.omit(countss)
+
+
+
+
+
+library(DESeq2)
+metaData <- data.frame(Group, row.names = colnames(countss[,2:5]))
+atacDDS <- DESeqDataSetFromMatrix(countss[2:5], metaData, ~Group)
+atacDDS <- DESeq(atacDDS)
+atac_Rlog <- rlog(atacDDS)
+plotPCA(atac_Rlog, intgroup = "Group", ntop = nrow(atac_Rlog))
+
+
+
+library(DESeq2)
+library(BSgenome.Mmusculus.UCSC.mm10)
+library(tracktables)
+
+
+HSCMinusCMP <- results(atacDDS, c("Group", "HSC", "CMP"), format = "GRangesList")
+HSCMinusCMP <- HSCMinusCMP[order(HSCMinusCMP$pvalue)]
+HSCMinusCMP
+
+
+
+
+
+
+filePath <- "~/GitHub/hemopoiesis-differentiation/data/Bams/"
+sampleNames <- c("ENCFF250YAL", "ENCFF958EPJ", "ENCFF711QAL", "ENCFF620WGW")
+peaks <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, "_peaks.narrowpeak"), header=T, sep="\t"), simplify=F)
+
+
+myPeaks <- lapply(peaks, ChIPQC:::GetGRanges, simple = TRUE)
+
+names(myPeaks) <- c("HSC", "HSC", "CMP", "CMP")
+
+Group=factor(c("HSC","HSC","CMP","CMP"))
+
+myGRangesList<-GRangesList(myPeaks)   
+
+reduced <- reduce(unlist(myGRangesList))
+consensusIDs <- paste0("consensus_", seq(1, length(reduced)))
+mcols(reduced) <- do.call(cbind, lapply(myGRangesList, function(x) (reduced %over% x) + 0))
+reducedConsensus <- reduced
+mcols(reducedConsensus) <- cbind(as.data.frame(mcols(reducedConsensus)), consensusIDs)
+consensusIDs <- paste0("consensus_", seq(1, length(reducedConsensus)))
+reducedconsensus
+
+
+library(limma)
+
+as.data.frame(elementMetadata(reducedConsensus)) %>% dplyr::select(starts_with("HSC")) %>% 
+    vennDiagram(main = "Overlap for Liver open regions")
+    
+    
+library(tidyr)
+
+myPlot <- as.data.frame(elementMetadata(reducedConsensus)) %>% dplyr::select(-consensusIDs) %>% 
+    as.matrix %>% t %>% prcomp %>% .$x %>% data.frame %>% mutate(Samples = rownames(.)) %>% 
+    mutate(Group = gsub("_\\d", "", Samples)) %>% ggplot(aes(x = PC1, y = PC2, 
+    colour = Group)) + geom_point(size = 5)
+
+myPlot
+
+
+
+library(Rsubread)
+occurrences <- elementMetadata(reducedConsensus) %>% as.data.frame %>% dplyr::select(-consensusIDs) %>% 
+    rowSums
+
+table(occurrences) %>% rev %>% cumsum
+
+
+consensusToCount <- reducedConsensus[occurrences >= 2, ]
+
+consensusToCount
+
+
+
+filePath <- "~/GitHub/hemopoiesis-differentiation/data/Bams/"
+sampleNames <- c("ENCFF250YAL", "ENCFF958EPJ", "ENCFF711QAL", "ENCFF620WGW")
+bamsToCount<- c("ENCFF250YAL.bam", "ENCFF958EPJ.bam", "ENCFF711QAL.bam", "ENCFF620WGW.bam")
+
+# indexBam(bamsToCount)
+regionsToCount <- data.frame(GeneID = paste("ID", seqnames(consensusToCount), 
+    start(consensusToCount), end(consensusToCount), sep = "_"), Chr = seqnames(consensusToCount), 
+    Start = start(consensusToCount), End = end(consensusToCount), Strand = strand(consensusToCount))
+fcResults <- featureCounts(files=bamsToCount,annot.ext=regionsToCount,isPairedEnd = FALSE,countMultiMappingReads = FALSE,maxFragLength=100)
+
+
+myCounts <- fcResults$counts
+colnames(myCounts) <- c("HSC_1","HSC_2","CMP_1","CMP_2")
+save(myCounts, file = "countsFromATAC.RData")
+
+
+
+pheatmap(myCounts[1:100,], scale='row', show_rownames = FALSE)
+
+
+
+
+library(DESeq2)
+metaData <- data.frame(Group, row.names = colnames(myCounts))
+atacDDS <- DESeqDataSetFromMatrix(myCounts, metaData, ~Group, rowRanges = consensusToCount)
+atacDDS <- DESeq(atacDDS)
+atac_Rlog <- rlog(atacDDS)
+plotPCA(atac_Rlog, intgroup = "Group", ntop = nrow(atac_Rlog))
+
+
+
+
+library(DESeq2)
+library(BSgenome.Mmusculus.UCSC.mm10)
+library(tracktables)
+
+
+HSCMinusCMP<- results(atacDDS, c("Group", "HSC", "CMP"), format = "GRanges")
+HSCMinusCMP<- HSCMinusCMP[order(HSCMinusCMP$pvalue)]
+HSCMinusCMP
+
+
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+toOverLap <- promoters(TxDb.Mmusculus.UCSC.mm10.knownGene, 500, 500)
+HSCMinusCMP <- HSCMinusCMP[(!is.na(HSCMinusCMP$padj) & HSCMinusCMP$pvalue < 0.05) & HSCMinusCMP %over% toOverLap]
+
+makebedtable(HSCMinusCMP, "HSCMinusCMP.html", filePath)
+
+
+
+library(clusterProfiler)
+library(ChIPseeker)
+BiocManager::install("org.Mm.eg.db")
+
+anno_HSCMinusCMP <- annotatePeak(HSCMinusCMP, TxDb = TxDb.Mmusculus.UCSC.mm10.knownGene)
+
+
+plotAnnoPie(anno_HSCMinusCMP)
+
+
+go1 <- enrichGO(as.data.frame(as.GRanges(anno_HSCMinusCMP )[as.GRanges(anno_HSCMinusCMP )$log2FoldChange > 
+    0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
+go2 <- enrichGO(as.data.frame(as.GRanges(anno_HSCMinusCMP )[as.GRanges(anno_HSCMinusCMP)$log2FoldChange < 
+    0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
+    
+
+
+head(go1, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable(elementId = "goEle1")
+    
+head(go2, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable(elementId = "goEle2")
+
+
+
+
+
+anno_HSCMinusCMP_GRanges <- as.GRanges(anno_HSCMinusCMP)
+
+
+
+anno_HSCMinusCMP_df <- as.data.frame(anno_HSCMinusCMP)
+write.table(anno_HSCMinusCMP_df, "anno_HSCMinusCMP.csv", quote = FALSE, row.names = FALSE, sep = ",")
+
+
+
+
+library(ChIPseeker)
+Calls <- annotatePeak(My_peaks, TxDb = TxDb.Hsapiens.UCSC.hg19.knownGene)
+
+
+
+
+
+
+
+
+
+
+
+pheatmap(myCounts[1:100,], scale='row', show_rownames = FALSE)
+
+
+
+
+
+library(stats)
+correlationMatrix <- cor(myCounts[1:1000,1:4])
+
+
+library(corrplot)
+corrplot(correlationMatrix, order = 'hclust',  addrect = 6, addCoef.col = 'white', number.cex = 0.7) 
+
+
+coldata=as.factor(sampleMetaData[1:2])
+
+library(pheatmap)
+# split the clusters into two based on the clustering similarity 
+pheatmap(correlationMatrix,cutree_cols = 2)
+
+
+
+
+

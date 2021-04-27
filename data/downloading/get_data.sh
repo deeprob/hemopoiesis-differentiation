@@ -13,7 +13,7 @@ exp_type=$2
 # Encode id to retrieve dataset
 encode_id=$3
 # Output Directory to store dataset
-output_dir="${4:-"../raw/"}"
+output_dir="raw"}"
 # creating file tag based on experiment type
 if [[ $exp_type = "RNASeq" ]]
 then
@@ -21,7 +21,7 @@ then
 	flag_type="tsv"
 elif [[ $exp_type = "ATACSeq" ]]
 then
-    flag_type="bigBed"
+    flag_type="bam"
 else
     echo "Error: wrong experiment type"
     exit 1
