@@ -1,0 +1,268 @@
+---
+title: "rna_seq"
+author: "STAT555 A7"
+date: "4/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# General RNA-Seq Pipeline
+
+Questions to answer: CMP vs ERY; HSC vs CMP
+
+## Libraries required
+```{r, message=FALSE}
+library(DESeq2)
+library(limma)
+library(pheatmap)
+library(biomaRt)
+library(VennDiagram)
+library(topGO)
+library(KEGGREST)
+library(org.Mm.eg.db)
+```
+
+
+## Global Variables for the script
+```{r}
+cell_line_a = "CMP" 
+cell_line_b = "Erythroblast"
+sample_a_rep1 = "ENCFF623OLU"
+sample_a_rep2 = "ENCFF691MHW"
+sample_b_rep1 = "ENCFF342WUL"
+sample_b_rep2 = "ENCFF858JHF"
+```
+
+
+## Helper Functions
+```{r}
+# function to create count matrix
+generate_count_mat = function(sample1a, sample1b, sample2a, sample2b, cell_line1, cell_line2, filePath="../data/raw/"){
+  sampleNames <- c(sample1a, sample1b, sample2a, sample2b) 
+  celllines <- c(rep(c(cell_line1), 2), rep(c(cell_line2),2))
+  file_path <- paste0(filePath, celllines, "/", sampleNames, ".tsv")
+  
+  countData.list <- sapply(file_path, function(x) read.csv(file=x, header=T, sep="\t"), simplify=F)
+  countData.df <- do.call("cbind", countData.list)
+  colsToKeep <- c(1, grep("expected_count", names(countData.df)))
+  counts <- countData.df[,colsToKeep]
+  countss <- counts[rowSums(counts[,(2:5)]) > 0, ]
+  names(countss) <- c("gene_id",sampleNames)
+  countss[,2:5] <- round(countss[,2:5])
+  
+  countss=na.omit(countss)
+
+  return(countss)
+}
+
+
+gen_corr_mat = function(cts, cell_line1, cell_line2){
+  names(cts) = c(rep(c(cell_line1), 2), rep(c(cell_line2),2))
+  corrmat = cor(cts)
+  pheatmap(corrmat)
+  
+  return()
+} 
+
+
+# function to generate deseq2 results
+generate_deseq_res = function(cell_line1, cell_line2, countss, sample1a, sample1b, sample2a, sample2b){
+  sampleNames <- c(sample1a, sample1b, sample2a, sample2b)
+  sampleMetaData <- data.frame(cell_line=c(rep(c(cell_line1), 2), rep(c(cell_line2),2)), sampleNames)
+
+  rsem.in=DESeqDataSetFromMatrix(countss, colData = sampleMetaData, design = ~ cell_line, tidy = T)
+  rsem.de <- DESeq(rsem.in)
+  
+  results1=results(rsem.de)
+  results_na_o=na.omit(results1)
+  return(results_na_o)
+}
+
+
+# function to generate limma-voom results
+generate_limma_res = function(cell_line1, cell_line2, countss, sample1a, sample1b, sample2a, sample2b){
+  
+  trts = c(rep(c(cell_line1), 2), rep(c(cell_line2),2))
+  design_trt=model.matrix(~0+trts)
+  
+  cts = countss[,-1]
+  row.names(cts) = countss[,1]
+  v <- voom(cts, design_trt, plot=FALSE)
+  fit <- lmFit(v, design_trt)
+  fit <- eBayes(fit)
+  
+  return(topTable(fit, coef=ncol(design_trt), number=Inf))  
+}
+
+
+get_sig_genes_deseq = function(deseq_res, p_adj=0.001){
+  sigres = deseq_res[which(deseq_res$padj<0.001),]
+  sigres = sigres[order(-sigres$padj),]
+  
+  significant_genes =  row.names(sigres)
+  return(significant_genes)
+}
+
+
+get_sig_genes_limma = function(limma_res, p_adj=0.001){
+  sigres = limma_res[which(limma_res$adj.P.Val<p_adj),]
+  sigres = sigres[order(-sigres$adj.P.Val),]
+  
+  significant_genes =  row.names(sigres)
+  return(significant_genes)
+}
+
+
+
+# function to map Ensemble ID to GO terms
+
+gen_functional_annot = function(significant_genes){
+  
+  mart <- biomaRt::useDataset(dataset = "mmusculus_gene_ensembl",   mart = useMart("ENSEMBL_MART_ENSEMBL", host = "www.ensembl.org"))
+  
+  bm <- getBM(attributes=c("ensembl_gene_id", "description", "go_id"), values=significant_genes, mart=mart)
+  
+  return(bm)
+}
+
+```
+
+
+Generating the count matrix from the files and checking if the replicates are correlated with each other
+```{r}
+cts = generate_count_mat(sample_a_rep1, sample_a_rep2, sample_b_rep1, sample_b_rep2, cell_line_a, cell_line_b)[,-1]
+gen_corr_mat(cts, cell_line_a, cell_line_b)
+```
+
+
+
+
+## 1. What genes are differentially expressed across each pair of cell lines?
+
+```{r}
+count_mat = generate_count_mat(sample_a_rep1, sample_a_rep2, sample_b_rep1, sample_b_rep2, cell_line_a, cell_line_b)
+deseq_res = generate_deseq_res(cell_line_a, cell_line_b, count_mat, sample_a_rep1, sample_a_rep2, sample_b_rep1, sample_b_rep2)
+limma_res = generate_limma_res(cell_line_a, cell_line_b, count_mat, sample_a_rep1, sample_a_rep2, sample_b_rep1, sample_b_rep2)
+
+```
+
+
+```{r}
+deseq_sig_genes = get_sig_genes_deseq(deseq_res)
+limma_sig_genes = get_sig_genes_limma(limma_res)
+```
+
+## 2. What are the functions of the genes with differential expression patterns?
+
+```{r}
+gen_func = gen_functional_annot(deseq_sig_genes)
+head(gen_func)
+```
+
+
+## 3. How consistent are the results between DEseq2 and limma voom?
+
+```{r}
+create_venn = function(deseq_sig_genes, limma_sig_genes){
+  grid.newpage()
+  draw.pairwise.venn(area1 = length(deseq_sig_genes), area2 = length(limma_sig_genes), cross.area = length(intersect(limma_sig_genes, deseq_sig_genes)), category = c("DESeq2", 
+      "Limma"))  
+  return()
+}
+```
+
+
+```{r}
+length(deseq_sig_genes)
+length(limma_sig_genes)
+create_venn(deseq_sig_genes, limma_sig_genes)
+```
+
+
+## 4. Construct a hierarchical tree using all the RNA-seq data, and perform clustering analysis. Describe the relationship based on your results.
+
+```{r}
+
+# Gene Set Enrichment Analysis
+# Reference: https://ucdavis-bioinformatics-training.github.io/2019_August_UCD_mRNAseq_Workshop/differential_expression/enrichment
+
+get_gsea = function(deseq_res){
+  
+  geneList <- deseq_res$pvalue
+  xx <- as.list(org.Mm.egENSEMBL2EG)
+  gene_names = row.names(deseq_res)
+  gene_names = gsub("\\..*","",gene_names)
+  names(geneList) <- xx[gene_names]
+  # Create topGOData object
+  GOdata <- new("topGOdata",
+  	ontology = "BP",
+  	allGenes = geneList,
+  	geneSelectionFun = function(x)x,
+  	annot = annFUN.org , mapping = "org.Mm.eg.db")
+  
+  # Kolmogorov-Smirnov testing
+  resultKS <- runTest(GOdata, algorithm = "weight01", statistic = "ks")
+  
+  tab <- GenTable(GOdata, raw.p.value = resultKS, topNodes = length(resultKS@score), numChar = 120)
+  
+  return(tab)
+}
+
+
+# Metabolic Pathway Analysis
+# Not right now 
+get_msea = function(geneList){
+  pathways.list <- keggList("pathway", "mmu")
+  pathway.codes <- sub("path:", "", names(pathways.list))
+  genes.by.pathway <- sapply(pathway.codes,
+  	function(pwid){
+  		pw <- keggGet(pwid)
+  		if (is.null(pw[[1]]$GENE)) return(NA)
+  		pw2 <- pw[[1]]$GENE[c(TRUE,FALSE)] # may need to modify this to c(FALSE, TRUE) for other organisms
+  		pw2 <- unlist(lapply(strsplit(pw2, split = ";", fixed = T), function(x)x[1]))
+  		return(pw2)
+  	}
+  )
+  
+  # Wilcoxon test for each pathway
+  pVals.by.pathway <- t(sapply(names(genes.by.pathway),
+  	function(pathway) {
+  		pathway.genes <- genes.by.pathway[[pathway]]
+  		list.genes.in.pathway <- intersect(names(geneList), pathway.genes)
+  		list.genes.not.in.pathway <- setdiff(names(geneList), list.genes.in.pathway)
+  		scores.in.pathway <- geneList[list.genes.in.pathway]
+  		scores.not.in.pathway <- geneList[list.genes.not.in.pathway]
+  		if (length(scores.in.pathway) > 0){
+  			p.value <- wilcox.test(scores.in.pathway, scores.not.in.pathway, alternative = "less")$p.value
+  		} else{
+  			p.value <- NA
+  		}
+  		return(c(p.value = p.value, Annotated = length(list.genes.in.pathway)))
+  	}
+  ))
+  
+  # Assemble output table
+  outdat <- data.frame(pathway.code = rownames(pVals.by.pathway))
+  outdat$pathway.name <- pathways.list[paste0("path:", outdat$pathway.code)]
+  outdat$p.value <- pVals.by.pathway[,"p.value"]
+  outdat$Annotated <- pVals.by.pathway[,"Annotated"]
+  outdat <- outdat[order(outdat$p.value),]
+  
+  return(outdat)
+  
+}
+
+
+```
+
+
+
+```{r}
+head(get_gsea(deseq_res), 50)
+```
+
+
+

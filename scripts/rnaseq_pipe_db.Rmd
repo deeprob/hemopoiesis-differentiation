@@ -16,11 +16,17 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ## RNASeq Pipeline
-
-### DESeq2
-
 Comparing CMP cell lines to ERY cell lines
 
+### Loading libraries
+```{r,message=FALSE}
+library(DESeq2)
+library(limma)
+library(qvalue)
+library(biomaRt)
+```
+
+### DESeq2
 
 ```{r}
 generate_count_mat = function(filename1a, filename1b, filename2a, filename2b){
@@ -66,12 +72,42 @@ de_res = deseq_res("../data/raw/CMP/ENCFF623OLU.tsv", '../data/raw/CMP/ENCFF691M
          '../data/raw/Erythroblast/ENCFF342WUL.tsv', '../data/raw/Erythroblast/ENCFF858JHF.tsv')
 ```
 
-
+What genes are differentially expressed across each pair of cell lines?
 ```{r}
 sigres = de_res[which(de_res$padj<0.001),]
-sigres[order(-sigres$padj),]
+sigres = sigres[order(sigres$padj),]
 ```
 
+
+What are the functions of the genes with differential expression patterns?
+
+```{r}
+# getting the gene id to go term mappings
+
+bm <- useMart("ensembl")
+bm <- useDataset("mmusculus_gene_ensembl", mart=bm)
+EG2GO <- getBM(mart=bm, attributes=c('ensembl_gene_id','ensembl_gene_id_version','external_gene_name','go_id'))
+EG2GO <- EG2GO[EG2GO$go_id != '',]
+geneID2GO <- by(EG2GO$go_id,
+                EG2GO$ensembl_gene_id,
+                function(x) as.character(x))
+```
+
+
+
+```{r}
+gene_names = head(row.names(sigres))
+gene_names = gsub("\\..*","",gene_names)
+```
+
+```{r}
+as.character(gene_names[1])
+```
+
+
+```{r}
+geneID2GO[gene_names[1]]
+```
 
 ### Limma 
 

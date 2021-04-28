@@ -1,0 +1,7 @@
+INFO [2021-04-27 15:34:02] $x
+INFO [2021-04-27 15:34:02] list(deseq_sig_genes, limma_sig_genes)
+INFO [2021-04-27 15:34:02] 
+INFO [2021-04-27 15:34:02] $filename
+INFO [2021-04-27 15:34:02] [1] "method_comp.png"
+INFO [2021-04-27 15:34:02] 
+ERROR [2021-04-27 15:34:02] Unexpected parameter length for 'category'
