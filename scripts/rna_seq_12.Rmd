@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # General RNA-Seq Pipeline
 
-Questions to answer: CMP vs ERY; HSC vs CMP
+Questions to answer: HSC vs CMP
 
 ## Libraries required
 ```{r, message=FALSE}
@@ -28,12 +28,12 @@ library(org.Mm.eg.db)
 
 ## Global Variables for the script
 ```{r}
-cell_line_a = "CMP" 
-cell_line_b = "Erythroblast"
-sample_a_rep1 = "ENCFF623OLU"
-sample_a_rep2 = "ENCFF691MHW"
-sample_b_rep1 = "ENCFF342WUL"
-sample_b_rep2 = "ENCFF858JHF"
+cell_line_a = "HSC" 
+cell_line_b = "CMP"
+sample_a_rep1 = "ENCFF247FEJ" 
+sample_a_rep2 = "ENCFF064MKY"
+sample_b_rep1 = "ENCFF623OLU"
+sample_b_rep2 = "ENCFF691MHW"
 ```
 
 
@@ -261,8 +261,11 @@ get_msea = function(geneList){
 
 
 ```{r}
-head(get_gsea(deseq_res), 50)
+gsea_deseq = get_gsea(deseq_res)
 ```
 
+```{r}
+write.csv(gsea_deseq, paste0(cell_line_a, "vs", cell_line_b, ".csv"))
+```
 
 
