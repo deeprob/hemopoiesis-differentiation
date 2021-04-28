@@ -2,3 +2,5 @@
 data/downloading/win-sudo/
 *.bam
 data/Bams/Mus_musculus.GRCm39.dna.primary_assembly.fa
+data/Bams/ENCFF199ZJX_summits.bed
+data/Bams/.RData
