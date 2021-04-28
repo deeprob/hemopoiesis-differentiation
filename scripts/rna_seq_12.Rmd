@@ -137,6 +137,17 @@ cts = generate_count_mat(sample_a_rep1, sample_a_rep2, sample_b_rep1, sample_b_r
 gen_corr_mat(cts, cell_line_a, cell_line_b)
 ```
 
+```{r}
+#type <- factor(type, levels = c("Leaf", "Fruit"))
+pca_res = prcomp(cts, scale. = TRUE)
+plot(pca_res$x)
+
+```
+
+
+```{r}
+pca_res
+```
 
 
 
@@ -179,6 +190,49 @@ create_venn = function(deseq_sig_genes, limma_sig_genes){
 length(deseq_sig_genes)
 length(limma_sig_genes)
 create_venn(deseq_sig_genes, limma_sig_genes)
+```
+
+
+```{r}
+
+gen_volcano_deseq = function(deseq_res){
+  tab = data.frame(logFC = deseq_res$log2FoldChange, negLogPval = -log10(deseq_res$pvalue))
+  par(mar = c(5, 4, 4, 4))
+  plot(tab, pch = 16, cex = 0.6, xlab = expression(log[2]~fold~change),ylab = expression(-log[10]~pvalue))
+  lfc = 2
+  pval = 0.001## Selecting interest genes
+  signGenes = (abs(tab$logFC) > lfc & tab$negLogPval > -log10(pval))
+  ## Identifying the selected genes
+  points(tab[signGenes, ], pch = 16, cex = 0.8, col = "red")
+  abline(h = -log10(pval), col = "green3", lty = 2)
+  abline(v = c(-lfc, lfc), col = "blue", lty = 2)
+  mtext(paste("pval =", pval), side = 4, at = -log10(pval), cex = 0.8, line = 0.5, las = 1)
+  mtext(c(paste("-", lfc, "fold"), paste("+", lfc, "fold")), side = 3, at = c(-lfc, lfc),cex = 0.8, line = 0.5)
+  
+}
+
+gen_volcano_limma = function(limma_res){
+  tab = data.frame(logFC = limma_res$logFC, negLogPval = -log10(limma_res$P.Value))
+  par(mar = c(5, 4, 4, 4))
+  plot(tab, pch = 16, cex = 0.6, xlab = expression(log[2]~fold~change),ylab = expression(-log[10]~pvalue))
+  lfc = 2
+  pval = 0.001## Selecting interest genes
+  signGenes = (abs(tab$logFC) > lfc & tab$negLogPval > -log10(pval))
+  ## Identifying the selected genes
+  points(tab[signGenes, ], pch = 16, cex = 0.8, col = "red")
+  abline(h = -log10(pval), col = "green3", lty = 2)
+  abline(v = c(-lfc, lfc), col = "blue", lty = 2)
+  mtext(paste("pval =", pval), side = 4, at = -log10(pval), cex = 0.8, line = 0.5, las = 1)
+  mtext(c(paste("-", lfc, "fold"), paste("+", lfc, "fold")), side = 3, at = c(-lfc, lfc),cex = 0.8, line = 0.5)
+  
+}
+
+```
+
+
+```{r}
+gen_volcano_deseq(deseq_res)
+gen_volcano_limma(limma_res)
 ```
 
 
@@ -262,6 +316,12 @@ get_msea = function(geneList){
 
 ```{r}
 gsea_deseq = get_gsea(deseq_res)
+```
+
+
+```{r}
+results_gsea = read.csv(paste0(cell_line_a, "vs", cell_line_b, ".csv"), sep=",")
+head(results_gsea[,c("Term", "raw.p.value")], n=25)
 ```
 
 ```{r}

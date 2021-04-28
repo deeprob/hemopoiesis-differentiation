@@ -138,11 +138,38 @@ gen_corr_mat(cts, cell_line_a, cell_line_b)
 ```
 
 
+```{r}
+
+get_pca_rep = function(cts){
+  rv = rowVars(as.matrix(cts))
+  select = order(rv, decreasing = TRUE)[1:15000]
+  pca = prcomp(t(cts[select, ]), scale. = TRUE)
+  
+  
+  
+  condition = factor(c(rep(c(cell_line_a), 2), rep(c(cell_line_b),2)))
+  colType <- c("forestgreen", "red2")[condition]
+  pchType <- c(18, 16)[condition]
+  plot(pca$x, col=colType, pch=pchType, cex = 2.0)
+  legend(
+    "topleft",
+    bty = "n",
+    c(cell_line_a, cell_line_b),
+    fill = c("forestgreen", "red2"),
+    cex = 1.0)  
+}
+
+```
+
+
+```{r}
+get_pca_rep(cts)
+```
 
 
 ## 1. What genes are differentially expressed across each pair of cell lines?
 
-```{r}
+```{r, message=FALSE}
 count_mat = generate_count_mat(sample_a_rep1, sample_a_rep2, sample_b_rep1, sample_b_rep2, cell_line_a, cell_line_b)
 deseq_res = generate_deseq_res(cell_line_a, cell_line_b, count_mat, sample_a_rep1, sample_a_rep2, sample_b_rep1, sample_b_rep2)
 limma_res = generate_limma_res(cell_line_a, cell_line_b, count_mat, sample_a_rep1, sample_a_rep2, sample_b_rep1, sample_b_rep2)
@@ -179,6 +206,46 @@ create_venn = function(deseq_sig_genes, limma_sig_genes){
 length(deseq_sig_genes)
 length(limma_sig_genes)
 create_venn(deseq_sig_genes, limma_sig_genes)
+```
+```{r}
+
+gen_volcano_deseq = function(deseq_res){
+  tab = data.frame(logFC = deseq_res$log2FoldChange, negLogPval = -log10(deseq_res$padj))
+  par(mar = c(5, 4, 4, 4))
+  plot(tab, pch = 16, cex = 0.6, xlab = expression(log[2]~fold~change),ylab = expression(-log[10]~pvalue), main="DESeq2 Volcano Plot")
+  lfc = 2
+  pval = 0.001## Selecting interest genes
+  signGenes = (abs(tab$logFC) > lfc & tab$negLogPval > -log10(pval))
+  ## Identifying the selected genes
+  points(tab[signGenes, ], pch = 16, cex = 0.8, col = "red")
+  abline(h = -log10(pval), col = "green3", lty = 2)
+  abline(v = c(-lfc, lfc), col = "blue", lty = 2)
+  mtext(paste("pval =", pval), side = 4, at = -log10(pval), cex = 0.8, line = 0.5, las = 1)
+  mtext(c(paste("-", lfc, "fold"), paste("+", lfc, "fold")), side = 3, at = c(-lfc, lfc),cex = 0.8, line = 0.5)
+  
+}
+
+gen_volcano_limma = function(limma_res){
+  tab = data.frame(logFC = limma_res$logFC, negLogPval = -log10(limma_res$adj.P.Val))
+  par(mar = c(5, 4, 4, 4))
+  plot(tab, pch = 16, cex = 0.6, xlab = expression(log[2]~fold~change),ylab = expression(-log[10]~pvalue), main="Limma-voom Volcano Plot")
+  lfc = 2
+  pval = 0.001## Selecting interest genes
+  signGenes = (abs(tab$logFC) > lfc & tab$negLogPval > -log10(pval))
+  ## Identifying the selected genes
+  points(tab[signGenes, ], pch = 16, cex = 0.8, col = "red")
+  abline(h = -log10(pval), col = "green3", lty = 2)
+  abline(v = c(-lfc, lfc), col = "blue", lty = 2)
+  mtext(paste("pval =", pval), side = 4, at = -log10(pval), cex = 0.8, line = 0.5, las = 1)
+  mtext(c(paste("-", lfc, "fold"), paste("+", lfc, "fold")), side = 3, at = c(-lfc, lfc),cex = 0.8, line = 0.5)
+  
+}
+```
+
+
+```{r}
+gen_volcano_deseq(deseq_res)
+gen_volcano_limma(limma_res)
 ```
 
 
@@ -260,12 +327,18 @@ get_msea = function(geneList){
 
 
 
-```{r}
+```{r, message=FALSE}
 gsea_deseq = get_gsea(deseq_res)
 ```
 
 ```{r}
-write.csv(gsea_deseq, paste0(cell_line_a, "vs", cell_line_b, ".csv"))
+results_gsea = read.csv(paste0(cell_line_a, "vs", cell_line_b, ".csv"), sep=",")
+head(results_gsea[,c("Term", "raw.p.value")], n=25)
+```
+
+
+```{r}
+write.csv(gsea_deseq, paste0(cell_line_a, "vs", cell_line_b, ".csv"), row.names = FALSE)
 ```
 
 
