@@ -114,6 +114,20 @@ rsem.de <- DESeq(rsem.in)
 
 
 
+
+
+dim(rsem.de [rowSums(counts(rsem.de )) > 5, ])
+
+results1=results(rsem.de)
+
+results_na_o=na.omit(results1)
+
+plotMA(results_na_o)
+
+
+
+
+
 1:3
 
 
@@ -236,7 +250,7 @@ countss=countss[-1]
 
   topTable(fit, number=10000, coef=ncol(design_trt))
 
-lim_ind=which(pvals<0.000000000005)
+lim_ind=which(fit$F.p.values<0.000000000005)
 
 
 m2
@@ -336,7 +350,7 @@ ggplot(deseq2ResDF, aes(baseMean, log2FoldChange, colour=padj)) + geom_point(siz
 
 
 
-which(qv$significant == TRUE)
+indexes=which(qvalues$significant == TRUE)
 
 
 
@@ -346,7 +360,7 @@ which(qv$significant == TRUE)
 
 
 
-index=which(sign == "TRUE", arr.ind = TRUE)
+#indexes=which(sign == "TRUE", arr.ind = TRUE)
 
 
 library(R.utils)
