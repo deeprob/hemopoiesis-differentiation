@@ -25,6 +25,8 @@ library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 
 
 
+BiocManager::install("enrichplot")
+
 
 filePath <- "~/GitHub/hemopoiesis-differentiation/data/Bams/"
 sampleNames <- c("ENCFF250YAL", "ENCFF958EPJ", "ENCFF711QAL", "ENCFF620WGW")
@@ -133,17 +135,15 @@ anno_HSCMinusCMP <- annotatePeak(HSCMinusCMP, TxDb = TxDb.Mmusculus.UCSC.mm10.kn
 plotAnnoPie(anno_HSCMinusCMP)
 
 
-go1 <- enrichGO(as.data.frame(as.GRanges(anno_HSCMinusCMP )[as.GRanges(anno_HSCMinusCMP )$log2FoldChange > 
-    0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
-go2 <- enrichGO(as.data.frame(as.GRanges(anno_HSCMinusCMP )[as.GRanges(anno_HSCMinusCMP)$log2FoldChange < 
-    0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
-    
 
 
 head(go1, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable(elementId = "goEle1")
     
 head(go2, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable(elementId = "goEle2")
 
+
+
+ridgeplot(go1)
 
 
 
@@ -173,7 +173,7 @@ pheatmap(myCounts[1:100,], scale='row', show_rownames = FALSE)
 
 
 library(stats)
-correlationMatrix <- cor(myCounts[1:1000,1:4])
+correlationMatrix <- cor(myCounts[1:10000,1:4])
 
 
 library(corrplot)
@@ -191,11 +191,4 @@ pheatmap(correlationMatrix,cutree_cols = 2)
 
 
 
-
-BiocManager::install("clusterProfiler", version = "3.8")
-BiocManager::install("pathview")
-BiocManager::install("enrichplot")
-
-# we use ggplot2 to add x axis labels (ex: ridgeplot)
-library(ggplot2)
 

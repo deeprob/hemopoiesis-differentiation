@@ -26,16 +26,17 @@ library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 
 
 
+
 filePath <- "~/GitHub/hemopoiesis-differentiation/data/Bams/"
-sampleNames <- c("ENCFF711QAL", "ENCFF620WGW", "ENCFF199ZJX", "ENCFF535OJU")
+sampleNames <- c("ENCFF199ZJX", "ENCFF535OJU", "ENCFF711QAL", "ENCFF620WGW")
 peaks <- sapply(sampleNames, function(x) read.csv(file=paste0(filePath, x, "_peaks.narrowpeak"), header=T, sep="\t"), simplify=F)
 
 
 myPeaks <- lapply(peaks, ChIPQC:::GetGRanges, simple = TRUE)
 
-names(myPeaks) <- c("HSC", "HSC", "CMP", "CMP")
+names(myPeaks) <- c("CMP", "CMP", "ERY", "ERY")
 
-Group=factor(c("HSC","HSC","CMP","CMP"))
+Group=factor(c("CMP","CMP","ERY","ERY"))
 
 myGRangesList<-GRangesList(myPeaks)   
 
@@ -50,7 +51,7 @@ reducedConsensus
 
 
 
-as.data.frame(elementMetadata(reducedConsensus)) %>% dplyr::select(starts_with("HSC")) %>% 
+as.data.frame(elementMetadata(reducedConsensus)) %>% dplyr::select(starts_with("CMP")) %>% 
     vennDiagram(main = "Overlap for Liver open regions")
     
     
@@ -72,13 +73,14 @@ occurrences <- elementMetadata(reducedConsensus) %>% as.data.frame %>% dplyr::se
 table(occurrences) %>% rev %>% cumsum
 
 
-consensusToCount <- reducedConsensus[occurrences >= 2, ]
+consensusToCount <- reducedConsensus[occurrences >= 2,]
 
 consensusToCount
 
 
 
 filePath <- "~/GitHub/hemopoiesis-differentiation/data/Bams/"
+sampleNames <- c("ENCFF711QAL", "ENCFF620WGW", "ENCFF199ZJX", "ENCFF535OJU")
 bamsToCount<- c("ENCFF711QAL.bam", "ENCFF620WGW.bam", "ENCFF199ZJX.bam", "ENCFF535OJU.bam")
 
 # indexBam(bamsToCount)
@@ -89,7 +91,7 @@ fcResults <- featureCounts(files=bamsToCount,annot.ext=regionsToCount,isPairedEn
 
 
 myCounts <- fcResults$counts
-colnames(myCounts) <- c("HSC_1","HSC_2","CMP_1","CMP_2")
+colnames(myCounts) <- c("CMP_1","CMP_2","ERY_1","ERY_2")
 save(myCounts, file = "countsFromATAC.RData")
 
 
@@ -112,31 +114,26 @@ plotPCA(atac_Rlog, intgroup = "Group", ntop = nrow(atac_Rlog))
 
 
 
-HSCMinusCMP<- results(atacDDS, c("Group", "HSC", "CMP"), format = "GRanges")
-HSCMinusCMP<- HSCMinusCMP[order(HSCMinusCMP$pvalue)]
-HSCMinusCMP
+CMPMinusERY<- results(atacDDS, c("Group", "CMP", "ERY"), format = "GRanges")
+CMPMinusERY<- CMPMinusERY[order(CMPMinusERY$pvalue)]
+CMPMinusERY
 
 
 
 toOverLap <- promoters(TxDb.Mmusculus.UCSC.mm10.knownGene, 500, 500)
-HSCMinusCMP <- HSCMinusCMP[(!is.na(HSCMinusCMP$padj) & HSCMinusCMP$pvalue < 0.05) & HSCMinusCMP %over% toOverLap]
+CMPMinusERY <- CMPMinusERY[(!is.na(CMPMinusERY$padj) & CMPMinusERY$pvalue < 0.05) & CMPMinusERY %over% toOverLap]
 
-makebedtable(HSCMinusCMP, "HSCMinusCMP.html", filePath)
-
-
+makebedtable(CMPMinusERY, "CMPMinusERY.html", filePath)
 
 
-anno_HSCMinusCMP <- annotatePeak(HSCMinusCMP, TxDb = TxDb.Mmusculus.UCSC.mm10.knownGene)
 
 
-plotAnnoPie(anno_HSCMinusCMP)
+anno_CMPMinusERY <- annotatePeak(CMPMinusERY, TxDb = TxDb.Mmusculus.UCSC.mm10.knownGene)
 
 
-go1 <- enrichGO(as.data.frame(as.GRanges(anno_HSCMinusCMP )[as.GRanges(anno_HSCMinusCMP )$log2FoldChange > 
-    0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
-go2 <- enrichGO(as.data.frame(as.GRanges(anno_HSCMinusCMP )[as.GRanges(anno_HSCMinusCMP)$log2FoldChange < 
-    0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
-    
+plotAnnoPie(anno_CMPMinusERY)
+
+
 
 
 head(go1, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable(elementId = "goEle1")
@@ -145,14 +142,17 @@ head(go2, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable
 
 
 
+ridgeplot(go1)
 
 
-anno_HSCMinusCMP_GRanges <- as.GRanges(anno_HSCMinusCMP)
+
+
+anno_CMPMinusERY_GRanges <- as.GRanges(anno_CMPMinusERY)
 
 
 
-anno_HSCMinusCMP_df <- as.data.frame(anno_HSCMinusCMP)
-write.table(anno_HSCMinusCMP_df, "anno_HSCMinusCMP.csv", quote = FALSE, row.names = FALSE, sep = ",")
+anno_CMPMinusERY_df <- as.data.frame(anno_CMPMinusERY)
+write.table(anno_CMPMinusERY_df, "anno_CMPMinusERY.csv", quote = FALSE, row.names = FALSE, sep = ",")
 
 
 
@@ -172,7 +172,7 @@ pheatmap(myCounts[1:100,], scale='row', show_rownames = FALSE)
 
 
 library(stats)
-correlationMatrix <- cor(myCounts[1:1000,1:4])
+correlationMatrix <- cor(myCounts[1:10000,1:4])
 
 
 library(corrplot)
@@ -190,11 +190,4 @@ pheatmap(correlationMatrix,cutree_cols = 2)
 
 
 
-
-BiocManager::install("clusterProfiler", version = "3.8")
-BiocManager::install("pathview")
-BiocManager::install("enrichplot")
-
-# we use ggplot2 to add x axis labels (ex: ridgeplot)
-library(ggplot2)
 
